@@ -1,30 +1,21 @@
 #!/usr/bin/env python3
-""" Redis with requests """
-import requests
-from functools import wraps
-from typing import Callable
+"""
+create a web cach
+"""
 import redis
+import requests
+rc = redis.Redis()
+count = 0
 
 
-def count(method: Callable):
-    """ Count the call to requests """
-    r = redis.Redis()
-
-    @wraps(method)
-    def wrapped(url):
-        """ function that will count """
-        r.incr(f"count:{url}")
-        expiration_count = r.get(f"cached:{url}")
-        if expiration_count:
-            return expiration_count.decode('utf-8')
-        html = method(url)
-        r.setex(f"cached:{url}", 10, html)
-        return html
-
-    return wrapped
-
-
-@count
 def get_page(url: str) -> str:
-    """ module to obtain the HTML """
-    return requests.get(url).text
+    """ get a page and cach value"""
+    rc.set(f"cached:{url}", count)
+    resp = requests.get(url)
+    rc.incr(f"count:{url}")
+    rc.setex(f"cached:{url}", 10, rc.get(f"cached:{url}"))
+    return resp.text
+
+
+if __name__ == "__main__":
+    get_page('http://slowwly.robertomurray.co.uk')
